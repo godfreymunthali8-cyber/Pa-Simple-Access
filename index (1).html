@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pa Simple Access</title>
+
+<style>
+body{font-family:Arial;margin:0;background:#f4f6f8}
+header{background:#007b5e;color:white;padding:15px;text-align:center}
+nav{display:none;background:#005a43;text-align:center}
+nav button{background:none;border:none;color:white;padding:15px;font-size:16px;cursor:pointer}
+section{display:none;padding:20px}
+.card{background:white;padding:15px;margin:15px 0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.1)}
+input,select,textarea,button{width:100%;padding:10px;margin:6px 0}
+button{background:#007b5e;color:white;border:none;cursor:pointer}
+
+#welcome{
+height:100vh;display:flex;flex-direction:column;
+justify-content:center;align-items:center;
+background:#007b5e;color:white;text-align:center
+}
+#welcome h1{font-size:36px}
+#welcome button{font-size:26px;padding:18px 45px}
+
+.gallery{display:flex;gap:10px;overflow-x:auto}
+.gallery img,.gallery video{height:120px;border-radius:6px;cursor:pointer}
+
+#viewer{
+display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+background:rgba(0,0,0,.9);z-index:999;
+justify-content:center;align-items:center;flex-direction:column
+}
+#viewer img{max-width:90%;max-height:80%}
+.viewer-controls button{margin:5px;padding:10px 20px;font-size:18px}
+</style>
+</head>
+
+<body>
+
+<!-- IMAGE/VIDEO VIEWER -->
+<div id="viewer">
+<img id="viewerImg">
+<div class="viewer-controls">
+<button onclick="prevImg()">⬅</button>
+<button onclick="closeViewer()">❌</button>
+<button onclick="nextImg()">➡</button>
+</div>
+</div>
+
+<div id="welcome">
+<h1>Welcome to Pa Simple Access</h1>
+<p>Transport • Accommodation • Restaurants</p>
+<button onclick="startApp()">START</button>
+</div>
+
+<header id="header" style="display:none;">
+<h2>Pa Simple Access</h2>
+</header>
+
+<nav id="nav">
+<button onclick="show('transport')">🚕 Transport</button>
+<button onclick="show('accommodation')">🏨 Accommodation</button>
+<button onclick="show('restaurants')">🍽️ Restaurants</button>
+<button onclick="show('admin')">🔐 Admin</button>
+</nav>
+
+<section id="transport">
+<h3>Find Transport</h3>
+<select id="tRegion"></select>
+<select id="tDistrict"></select>
+<button onclick="searchTransport()">Search</button>
+<div id="transportResults"></div>
+</section>
+
+<section id="accommodation">
+<h3>Accommodation</h3>
+<select id="aRegion"></select>
+<select id="aDistrict"></select>
+<button onclick="searchAccommodation()">Search</button>
+<div id="accommodationResults"></div>
+</section>
+
+<section id="restaurants">
+<h3>Restaurants</h3>
+<select id="rRegion"></select>
+<select id="rDistrict"></select>
+<button onclick="searchRestaurants()">Search</button>
+<div id="restaurantResults"></div>
+</section>
+
+<section id="admin">
+<h3>Admin Panel</h3>
+<input type="password" id="adminPass" placeholder="Password (admin123)">
+<button onclick="loginAdmin()">Login</button>
+
+<div id="adminForms" style="display:none">
+
+<h4>Upload Transport</h4>
+<input id="tName" placeholder="Driver Name">
+<input id="tPhone" placeholder="Phone">
+<select id="tAR"></select>
+<select id="tAD"></select>
+<button onclick="addTransport()">Upload</button>
+
+<h4>Upload Accommodation</h4>
+<input id="aName" placeholder="Name">
+<textarea id="aDesc" placeholder="Description"></textarea>
+<input type="file" id="aImgs" multiple>
+<input type="file" id="aVids" multiple accept="video/*">
+<select id="aAR"></select>
+<select id="aAD"></select>
+<button onclick="addAccommodation()">Upload</button>
+
+<h4>Upload Restaurant</h4>
+<input id="rName" placeholder="Restaurant Name">
+<textarea id="rDesc" placeholder="Description"></textarea>
+<input type="file" id="rImgs" multiple>
+<select id="rAR"></select>
+<select id="rAD"></select>
+<button onclick="addRestaurant()">Upload</button>
+
+<h4>Admin History (Delete)</h4>
+<div id="history"></div>
+
+</div>
+</section>
+
+<script>
+var locations={
+  Northern:["Mzuzu","Mzimba","Karonga","Rumphi"],
+  Central:["Lilongwe","Kasungu","Salima","Dowa"],
+  Southern:["Blantyre","Zomba","Mangochi","Mulanje"]
+};
+
+var transport=JSON.parse(localStorage.getItem("transport")||"[]");
+var accommodation=JSON.parse(localStorage.getItem("accommodation")||"[]");
+var restaurants=JSON.parse(localStorage.getItem("restaurants")||"[]");
+
+var viewerImgs=[],viewerIndex=0;
+
+function startApp(){
+document.getElementById("welcome").style.display="none";
+document.getElementById("header").style.display="block";
+document.getElementById("nav").style.display="block";
+initSelects();
+show("transport");
+}
+
+function show(id){
+var secs=document.getElementsByTagName("section");
+for(var i=0;i<secs.length;i++){secs[i].style.display="none";}
+document.getElementById(id).style.display="block";
+}
+
+function initSelects(){
+var types=["t","a","r"];
+for(var p=0;p<types.length;p++){
+var r=document.getElementById(types[p]+"Region");
+var d=document.getElementById(types[p]+"District");
+r.innerHTML="<option>Select Region</option>";
+for(var k in locations){r.innerHTML+="<option>"+k+"</option>";}
+r.onchange=(function(r1,d1){return function(){d1.innerHTML="<option>Select District</option>";var arr=locations[r1.value];if(!arr) return;for(var i=0;i<arr.length;i++){d1.innerHTML+="<option>"+arr[i]+"</option>";}}})(r,d);
+}
+
+var admin=["t","a","r"];
+for(var p=0;p<admin.length;p++){
+var ar=document.getElementById(admin[p]+"AR");
+var ad=document.getElementById(admin[p]+"AD");
+ar.innerHTML="<option>Select Region</option>";
+for(var k in locations){ar.innerHTML+="<option>"+k+"</option>";}
+ar.onchange=(function(r1,d1){return function(){d1.innerHTML="<option>Select District</option>";var arr=locations[r1.value];if(!arr) return;for(var i=0;i<arr.length;i++){d1.innerHTML+="<option>"+arr[i]+"</option>";}}})(ar,ad);
+}
+}
+
+function loginAdmin(){
+if(document.getElementById("adminPass").value==="admin123"){
+document.getElementById("adminForms").style.display="block";
+loadHistory();
+}else alert("Wrong password");
+}
+
+function fileToBase64(files,cb){
+var arr=[],done=0;
+if(files.length===0){cb(arr);return;}
+for(var i=0;i<files.length;i++){
+(function(f){
+var r=new FileReader();
+r.onload=function(){arr.push(r.result);done++;if(done===files.length) cb(arr);};
+r.readAsDataURL(f);
+})(files[i]);
+}
+}
+
+function addTransport(){
+transport.push({name:document.getElementById("tName").value,phone:document.getElementById("tPhone").value,region:document.getElementById("tAR").value,district:document.getElementById("tAD").value});
+localStorage.setItem("transport",JSON.stringify(transport));
+loadHistory(); alert("Uploaded");
+}
+
+function addAccommodation(){
+var imgsFiles = document.getElementById("aImgs").files;
+if(imgsFiles.length < 2){
+  alert("Please select at least 2 images for Accommodation.");
+  return;
+}
+fileToBase64(imgsFiles,function(imgs){
+fileToBase64(document.getElementById("aVids").files,function(vids){
+accommodation.push({name:document.getElementById("aName").value,desc:document.getElementById("aDesc").value,imgs:imgs,vids:vids,region:document.getElementById("aAR").value,district:document.getElementById("aAD").value});
+localStorage.setItem("accommodation",JSON.stringify(accommodation));
+loadHistory(); alert("Uploaded");
+});
+});
+}
+
+function addRestaurant(){
+var imgsFiles = document.getElementById("rImgs").files;
+if(imgsFiles.length < 2){
+  alert("Please select at least 2 images for Restaurant.");
+  return;
+}
+fileToBase64(imgsFiles,function(imgs){
+restaurants.push({name:document.getElementById("rName").value,desc:document.getElementById("rDesc").value,imgs:imgs,region:document.getElementById("rAR").value,district:document.getElementById("rAD").value});
+localStorage.setItem("restaurants",JSON.stringify(restaurants));
+loadHistory(); alert("Uploaded");
+});
+}
+
+function openViewer(arr,i){
+viewerImgs=arr;
+viewerIndex=i;
+document.getElementById("viewerImg").src=arr[i];
+document.getElementById("viewer").style.display="flex";
+}
+function closeViewer(){document.getElementById("viewer").style.display="none";}
+function nextImg(){viewerIndex=(viewerIndex+1)%viewerImgs.length;document.getElementById("viewerImg").src=viewerImgs[viewerIndex];}
+function prevImg(){viewerIndex=(viewerIndex-1+viewerImgs.length)%viewerImgs.length;document.getElementById("viewerImg").src=viewerImgs[viewerIndex];}
+
+function searchTransport(){
+var res=document.getElementById("transportResults"); res.innerHTML="";
+for(var i=0;i<transport.length;i++){
+var x=transport[i];
+if(x.region===document.getElementById("tRegion").value && x.district===document.getElementById("tDistrict").value){
+res.innerHTML+="<div class='card'>"+x.name+"<br>"+x.phone+"</div>";
+}
+}
+}
+
+function searchAccommodation(){
+var res=document.getElementById("accommodationResults"); res.innerHTML="";
+for(var i=0;i<accommodation.length;i++){
+var x=accommodation[i];
+if(x.region===document.getElementById("aRegion").value && x.district===document.getElementById("aDistrict").value){
+var imgs=""; for(var j=0;j<x.imgs.length;j++){imgs+="<img src='"+x.imgs[j]+"' onclick='openViewer("+JSON.stringify(x.imgs)+","+j+")'>";}
+var vids=""; for(j=0;j<x.vids.length;j++){vids+="<video controls src='"+x.vids[j]+"'></video>";}
+res.innerHTML+="<div class='card'><b>"+x.name+"</b><br>"+x.desc+"<div class='gallery'>"+imgs+vids+"</div></div>";
+}
+}
+}
+
+function searchRestaurants(){
+var res=document.getElementById("restaurantResults"); res.innerHTML="";
+for(var i=0;i<restaurants.length;i++){
+var x=restaurants[i];
+if(x.region===document.getElementById("rRegion").value && x.district===document.getElementById("rDistrict").value){
+var imgs=""; if(x.imgs){for(var j=0;j<x.imgs.length;j++){imgs+="<img src='"+x.imgs[j]+"' onclick='openViewer("+JSON.stringify(x.imgs)+","+j+")'>";}}
+res.innerHTML+="<div class='card'><b>"+x.name+"</b><br>"+x.desc+"<div class='gallery'>"+imgs+"</div></div>";
+}
+}
+}
+
+function loadHistory(){
+var res=document.getElementById("history"); res.innerHTML="";
+for(var i=0;i<transport.length;i++){res.innerHTML+="🚕 "+transport[i].name+" <button onclick='transport.splice("+i+",1);localStorage.setItem(\"transport\",JSON.stringify(transport));loadHistory()'>Delete</button><br>";}
+for(i=0;i<accommodation.length;i++){res.innerHTML+="🏨 "+accommodation[i].name+" <button onclick='accommodation.splice("+i+",1);localStorage.setItem(\"accommodation\",JSON.stringify(accommodation));loadHistory()'>Delete</button><br>";}
+for(i=0;i<restaurants.length;i++){res.innerHTML+="🍽️ "+restaurants[i].name+" <button onclick='restaurants.splice("+i+",1);localStorage.setItem(\"restaurants\",JSON.stringify(restaurants));loadHistory()'>Delete</button><br>";}
+}
+</script>
+
+</body>
+</html>
